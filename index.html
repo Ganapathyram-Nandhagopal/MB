@@ -3,47 +3,75 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>InvoicePro - Modern Billing Application</title>
+    <title>InvoicePro - Premium Billing Application</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <link rel="stylesheet" href="styles/main.css">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <script src="https://apis.google.com/js/api.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode/1.5.3/qrcode.min.js"></script>
 </head>
 <body>
     <div class="app-container">
-        <!-- Sidebar -->
-        <nav class="sidebar">
+        <!-- Animated Background -->
+        <div class="animated-bg">
+            <div class="gradient-orb orb-1"></div>
+            <div class="gradient-orb orb-2"></div>
+            <div class="gradient-orb orb-3"></div>
+        </div>
+
+        <!-- Glassmorphic Sidebar -->
+        <nav class="sidebar glass-card">
             <div class="sidebar-header">
-                <h2><i class="fas fa-receipt"></i> InvoicePro</h2>
+                <div class="logo">
+                    <i class="fas fa-receipt"></i>
+                    <h2>InvoicePro</h2>
+                </div>
+                <button class="theme-toggle" id="themeToggle">
+                    <i class="fas fa-moon"></i>
+                </button>
             </div>
-            <ul class="sidebar-nav">
+            
+            <ul class="nav-menu">
                 <li class="nav-item active" data-section="dashboard">
-                    <i class="fas fa-tachometer-alt"></i>
+                    <i class="fas fa-chart-pie"></i>
                     <span>Dashboard</span>
+                    <div class="nav-glow"></div>
                 </li>
-                <li class="nav-item" data-section="invoice-builder">
+                <li class="nav-item" data-section="new-invoice">
                     <i class="fas fa-plus-circle"></i>
-                    <span>Create Invoice</span>
+                    <span>New Invoice</span>
+                    <div class="nav-glow"></div>
+                </li>
+                <li class="nav-item" data-section="invoice-list">
+                    <i class="fas fa-list-alt"></i>
+                    <span>Invoice List</span>
+                    <div class="nav-glow"></div>
                 </li>
                 <li class="nav-item" data-section="templates">
                     <i class="fas fa-palette"></i>
                     <span>Templates</span>
+                    <div class="nav-glow"></div>
                 </li>
                 <li class="nav-item" data-section="settings">
                     <i class="fas fa-cog"></i>
                     <span>Settings</span>
+                    <div class="nav-glow"></div>
                 </li>
             </ul>
+
             <div class="sidebar-footer">
-                <button id="google-auth-btn" class="auth-btn">
-                    <i class="fab fa-google"></i>
-                    <span>Connect Google Drive</span>
+                <button class="google-drive-btn glass-btn" id="googleDriveBtn">
+                    <i class="fab fa-google-drive"></i>
+                    <span>Connect Drive</span>
                 </button>
             </div>
         </nav>
 
         <!-- Mobile Menu Toggle -->
-        <button class="mobile-menu-toggle">
+        <button class="mobile-menu-toggle glass-btn" id="mobileToggle">
             <i class="fas fa-bars"></i>
         </button>
 
@@ -52,179 +80,163 @@
             <!-- Dashboard Section -->
             <section id="dashboard" class="content-section active">
                 <div class="section-header">
-                    <h1>Dashboard</h1>
-                    <button id="create-new-invoice" class="btn btn-primary">
-                        <i class="fas fa-plus"></i> Create New Invoice
+                    <h1 class="section-title">Dashboard</h1>
+                    <button class="primary-btn glow-btn" id="createInvoiceBtn">
+                        <i class="fas fa-plus"></i>
+                        Create Invoice
                     </button>
                 </div>
 
+                <!-- Stats Cards -->
                 <div class="stats-grid">
-                    <div class="stat-card">
-                        <div class="stat-icon">
+                    <div class="stat-card glass-card">
+                        <div class="stat-icon blue-gradient">
                             <i class="fas fa-file-invoice"></i>
                         </div>
                         <div class="stat-content">
-                            <h3 id="total-invoices">0</h3>
+                            <h3 id="totalInvoices">0</h3>
                             <p>Total Invoices</p>
                         </div>
                     </div>
-                    <div class="stat-card">
-                        <div class="stat-icon">
+                    <div class="stat-card glass-card">
+                        <div class="stat-icon green-gradient">
                             <i class="fas fa-dollar-sign"></i>
                         </div>
                         <div class="stat-content">
-                            <h3 id="total-amount">$0</h3>
-                            <p>Total Amount</p>
+                            <h3 id="totalRevenue">$0</h3>
+                            <p>Total Revenue</p>
                         </div>
                     </div>
-                    <div class="stat-card">
-                        <div class="stat-icon">
-                            <i class="fas fa-calendar-alt"></i>
+                    <div class="stat-card glass-card">
+                        <div class="stat-icon purple-gradient">
+                            <i class="fas fa-check-circle"></i>
                         </div>
                         <div class="stat-content">
-                            <h3 id="this-month">0</h3>
-                            <p>This Month</p>
+                            <h3 id="paidInvoices">0</h3>
+                            <p>Paid Invoices</p>
+                        </div>
+                    </div>
+                    <div class="stat-card glass-card">
+                        <div class="stat-icon orange-gradient">
+                            <i class="fas fa-clock"></i>
+                        </div>
+                        <div class="stat-content">
+                            <h3 id="pendingInvoices">0</h3>
+                            <p>Pending</p>
                         </div>
                     </div>
                 </div>
 
-                <div class="dashboard-grid">
-                    <div class="invoices-section">
+                <!-- Recent Invoices -->
+                <div class="dashboard-content">
+                    <div class="recent-invoices glass-card">
                         <h2>Recent Invoices</h2>
-                        <div id="invoices-list" class="invoices-list">
-                            <div class="empty-state">
-                                <i class="fas fa-file-invoice fa-3x"></i>
-                                <h3>No invoices yet</h3>
-                                <p>Create your first invoice to get started</p>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="templates-section">
-                        <h2>Invoice Templates</h2>
-                        <div class="template-carousel">
-                            <div class="template-card" data-template="modern">
-                                <div class="template-preview modern-preview">
-                                    <div class="preview-header"></div>
-                                    <div class="preview-lines"></div>
-                                </div>
-                                <h3>Modern</h3>
-                                <p>Clean and professional</p>
-                            </div>
-                            <div class="template-card" data-template="classic">
-                                <div class="template-preview classic-preview">
-                                    <div class="preview-header"></div>
-                                    <div class="preview-lines"></div>
-                                </div>
-                                <h3>Classic</h3>
-                                <p>Traditional business style</p>
-                            </div>
-                            <div class="template-card" data-template="minimal">
-                                <div class="template-preview minimal-preview">
-                                    <div class="preview-header"></div>
-                                    <div class="preview-lines"></div>
-                                </div>
-                                <h3>Minimal</h3>
-                                <p>Simple and elegant</p>
-                            </div>
+                        <div id="recentInvoicesList" class="invoices-list">
+                            <!-- Invoices will be populated here -->
                         </div>
                     </div>
                 </div>
             </section>
 
-            <!-- Invoice Builder Section -->
-            <section id="invoice-builder" class="content-section">
+            <!-- New Invoice Section -->
+            <section id="new-invoice" class="content-section">
                 <div class="section-header">
-                    <h1>Create Invoice</h1>
+                    <h1 class="section-title">Create New Invoice</h1>
                     <div class="header-actions">
-                        <button id="preview-invoice" class="btn btn-secondary">
-                            <i class="fas fa-eye"></i> Preview
+                        <button class="secondary-btn" id="previewBtn">
+                            <i class="fas fa-eye"></i>
+                            Preview
                         </button>
-                        <button id="save-invoice" class="btn btn-success">
-                            <i class="fas fa-save"></i> Save
-                        </button>
-                        <button id="export-pdf" class="btn btn-primary">
-                            <i class="fas fa-file-pdf"></i> Export PDF
+                        <button class="primary-btn glow-btn" id="saveInvoiceBtn">
+                            <i class="fas fa-save"></i>
+                            Save Invoice
                         </button>
                     </div>
                 </div>
 
-                <div class="builder-grid">
-                    <div class="builder-form">
+                <div class="invoice-builder">
+                    <div class="builder-form glass-card">
+                        <!-- Invoice Details -->
                         <div class="form-section">
                             <h3>Invoice Details</h3>
-                            <div class="form-group">
-                                <label for="invoice-number">Invoice Number</label>
-                                <input type="text" id="invoice-number" placeholder="INV-001">
-                            </div>
-                            <div class="form-group">
-                                <label for="invoice-date">Date</label>
-                                <input type="date" id="invoice-date">
-                            </div>
-                            <div class="form-group">
-                                <label for="due-date">Due Date</label>
-                                <input type="date" id="due-date">
-                            </div>
-                            <div class="form-group">
-                                <label for="template-select">Template</label>
-                                <select id="template-select">
-                                    <option value="modern">Modern</option>
-                                    <option value="classic">Classic</option>
-                                    <option value="minimal">Minimal</option>
-                                </select>
+                            <div class="form-grid">
+                                <div class="form-group">
+                                    <label>Invoice Number</label>
+                                    <input type="text" id="invoiceNumber" class="glass-input" placeholder="INV-001">
+                                </div>
+                                <div class="form-group">
+                                    <label>Date</label>
+                                    <input type="date" id="invoiceDate" class="glass-input">
+                                </div>
+                                <div class="form-group">
+                                    <label>Due Date</label>
+                                    <input type="date" id="dueDate" class="glass-input">
+                                </div>
+                                <div class="form-group">
+                                    <label>Template</label>
+                                    <select id="templateSelect" class="glass-input">
+                                        <option value="modern">Modern Blue</option>
+                                        <option value="elegant">Elegant Purple</option>
+                                        <option value="minimal">Minimal Green</option>
+                                    </select>
+                                </div>
                             </div>
                         </div>
 
+                        <!-- Company Info -->
                         <div class="form-section">
-                            <h3>Business Information</h3>
-                            <div class="form-group">
-                                <label for="business-name">Business Name</label>
-                                <input type="text" id="business-name" placeholder="Your Business Name">
-                            </div>
-                            <div class="form-group">
-                                <label for="business-address">Address</label>
-                                <textarea id="business-address" placeholder="Your business address"></textarea>
-                            </div>
-                            <div class="form-group">
-                                <label for="business-email">Email</label>
-                                <input type="email" id="business-email" placeholder="contact@business.com">
+                            <h3>Company Information</h3>
+                            <div class="form-grid">
+                                <div class="form-group">
+                                    <label>Company Name</label>
+                                    <input type="text" id="companyName" class="glass-input" placeholder="Your Company Name">
+                                </div>
+                                <div class="form-group">
+                                    <label>Email</label>
+                                    <input type="email" id="companyEmail" class="glass-input" placeholder="company@email.com">
+                                </div>
+                                <div class="form-group full-width">
+                                    <label>Address</label>
+                                    <textarea id="companyAddress" class="glass-input" placeholder="Company Address"></textarea>
+                                </div>
                             </div>
                         </div>
 
+                        <!-- Client Info -->
                         <div class="form-section">
                             <h3>Client Information</h3>
-                            <div class="form-group">
-                                <label for="client-name">Client Name</label>
-                                <input type="text" id="client-name" placeholder="Client Name">
-                            </div>
-                            <div class="form-group">
-                                <label for="client-address">Address</label>
-                                <textarea id="client-address" placeholder="Client address"></textarea>
-                            </div>
-                            <div class="form-group">
-                                <label for="client-email">Email</label>
-                                <input type="email" id="client-email" placeholder="client@email.com">
+                            <div class="form-grid">
+                                <div class="form-group">
+                                    <label>Client Name</label>
+                                    <input type="text" id="clientName" class="glass-input" placeholder="Client Name">
+                                </div>
+                                <div class="form-group">
+                                    <label>Email</label>
+                                    <input type="email" id="clientEmail" class="glass-input" placeholder="client@email.com">
+                                </div>
+                                <div class="form-group full-width">
+                                    <label>Address</label>
+                                    <textarea id="clientAddress" class="glass-input" placeholder="Client Address"></textarea>
+                                </div>
                             </div>
                         </div>
 
+                        <!-- Items -->
                         <div class="form-section">
-                            <h3>Items</h3>
-                            <div class="items-container">
-                                <div class="items-header">
-                                    <span>Description</span>
-                                    <span>Qty</span>
-                                    <span>Rate</span>
-                                    <span>Amount</span>
-                                    <span></span>
-                                </div>
-                                <div id="items-list">
-                                    <!-- Items will be added dynamically -->
-                                </div>
-                                <button id="add-item" class="btn btn-outline">
-                                    <i class="fas fa-plus"></i> Add Item
+                            <div class="section-header-inline">
+                                <h3>Items</h3>
+                                <button type="button" class="secondary-btn" id="addItemBtn">
+                                    <i class="fas fa-plus"></i>
+                                    Add Item
                                 </button>
                             </div>
+                            <div id="itemsList" class="items-list">
+                                <!-- Items will be added dynamically -->
+                            </div>
+                        </div>
 
+                        <!-- Totals -->
+                        <div class="form-section">
                             <div class="totals-section">
                                 <div class="total-row">
                                     <span>Subtotal:</span>
@@ -232,68 +244,117 @@
                                 </div>
                                 <div class="total-row">
                                     <span>Tax Rate:</span>
-                                    <input type="number" id="tax-rate" value="0" min="0" max="100" step="0.1">%
+                                    <div class="tax-input">
+                                        <input type="number" id="taxRate" class="glass-input small" value="0" min="0" max="100" step="0.1">
+                                        <span>%</span>
+                                    </div>
                                 </div>
                                 <div class="total-row">
                                     <span>Tax Amount:</span>
-                                    <span id="tax-amount">$0.00</span>
+                                    <span id="taxAmount">$0.00</span>
                                 </div>
                                 <div class="total-row final-total">
                                     <span>Total:</span>
-                                    <span id="total-amount">$0.00</span>
+                                    <span id="totalAmount">$0.00</span>
                                 </div>
                             </div>
                         </div>
                     </div>
 
-                    <div class="builder-preview">
+                    <!-- Live Preview -->
+                    <div class="invoice-preview glass-card">
                         <div class="preview-header">
-                            <h3>Preview</h3>
+                            <h3>Live Preview</h3>
+                            <div class="preview-actions">
+                                <button class="icon-btn" id="exportPdfBtn" title="Export PDF">
+                                    <i class="fas fa-file-pdf"></i>
+                                </button>
+                                <button class="icon-btn" id="printBtn" title="Print">
+                                    <i class="fas fa-print"></i>
+                                </button>
+                            </div>
                         </div>
-                        <div id="invoice-preview" class="invoice-preview">
+                        <div id="invoicePreview" class="preview-content">
                             <!-- Preview will be generated here -->
                         </div>
                     </div>
                 </div>
             </section>
 
+            <!-- Invoice List Section -->
+            <section id="invoice-list" class="content-section">
+                <div class="section-header">
+                    <h1 class="section-title">Invoice List</h1>
+                    <div class="search-container">
+                        <input type="text" id="searchInput" class="glass-input" placeholder="Search invoices...">
+                        <i class="fas fa-search"></i>
+                    </div>
+                </div>
+
+                <div id="invoiceListContainer" class="invoice-grid">
+                    <!-- Invoice cards will be populated here -->
+                </div>
+            </section>
+
             <!-- Templates Section -->
             <section id="templates" class="content-section">
                 <div class="section-header">
-                    <h1>Invoice Templates</h1>
+                    <h1 class="section-title">Invoice Templates</h1>
+                    <p class="section-subtitle">Choose from our collection of premium templates</p>
                 </div>
+
                 <div class="templates-grid">
-                    <div class="template-card large" data-template="modern">
-                        <div class="template-preview modern-preview large">
-                            <div class="preview-header"></div>
-                            <div class="preview-lines"></div>
+                    <div class="template-card glass-card" data-template="modern">
+                        <div class="template-preview modern-preview">
+                            <div class="preview-header blue-gradient"></div>
+                            <div class="preview-content">
+                                <div class="preview-line"></div>
+                                <div class="preview-line short"></div>
+                                <div class="preview-line"></div>
+                            </div>
                         </div>
                         <div class="template-info">
-                            <h3>Modern Template</h3>
-                            <p>A clean, contemporary design perfect for modern businesses. Features bold typography and organized layout.</p>
-                            <button class="btn btn-primary" onclick="selectTemplate('modern')">Use Template</button>
+                            <h3>Modern Blue</h3>
+                            <p>Clean and professional design with blue accents</p>
+                            <button class="select-template-btn" data-template="modern">
+                                Select Template
+                            </button>
                         </div>
                     </div>
-                    <div class="template-card large" data-template="classic">
-                        <div class="template-preview classic-preview large">
-                            <div class="preview-header"></div>
-                            <div class="preview-lines"></div>
+
+                    <div class="template-card glass-card" data-template="elegant">
+                        <div class="template-preview elegant-preview">
+                            <div class="preview-header purple-gradient"></div>
+                            <div class="preview-content">
+                                <div class="preview-line"></div>
+                                <div class="preview-line short"></div>
+                                <div class="preview-line"></div>
+                            </div>
                         </div>
                         <div class="template-info">
-                            <h3>Classic Template</h3>
-                            <p>Traditional business invoice design with professional appearance. Ideal for established companies.</p>
-                            <button class="btn btn-primary" onclick="selectTemplate('classic')">Use Template</button>
+                            <h3>Elegant Purple</h3>
+                            <p>Sophisticated design with purple gradients</p>
+                            <button class="select-template-btn" data-template="elegant">
+                                Select Template
+                            </button>
                         </div>
                     </div>
-                    <div class="template-card large" data-template="minimal">
-                        <div class="template-preview minimal-preview large">
-                            <div class="preview-header"></div>
-                            <div class="preview-lines"></div>
+
+                    <div class="template-card glass-card" data-template="minimal">
+                        <div class="template-preview minimal-preview">
+                            <div class="preview-header green-gradient"></div>
+                            <div class="preview-content">
+                                <div class="preview-line"></div>
+                                <div class="preview-line short"></div>
+                                <div class="preview-line"></div>
+                            </div>
                         </div>
                         <div class="template-info">
-                            <h3>Minimal Template</h3>
-                            <p>Simple and elegant design focusing on clarity and readability. Perfect for creative professionals.</p>
-                            <button class="btn btn-primary" onclick="selectTemplate('minimal')">Use Template</button>
+                            <h3>Minimal Green</h3>
+                            <p>Simple and clean with green highlights</p>
+                            <button class="select-template-btn" data-template="minimal">
+                                Select Template
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -302,63 +363,92 @@
             <!-- Settings Section -->
             <section id="settings" class="content-section">
                 <div class="section-header">
-                    <h1>Settings</h1>
+                    <h1 class="section-title">Settings</h1>
                 </div>
+
                 <div class="settings-grid">
-                    <div class="settings-card">
+                    <div class="settings-card glass-card">
                         <h3>Google Drive Integration</h3>
-                        <p>Connect your Google Drive account to automatically save invoices to the cloud.</p>
-                        <div class="auth-status">
-                            <span id="auth-status">Not connected</span>
-                            <button id="auth-toggle" class="btn btn-primary">Connect</button>
+                        <p>Connect your Google Drive to automatically save invoices</p>
+                        <div class="setting-item">
+                            <span id="driveStatus">Not Connected</span>
+                            <button class="toggle-btn" id="driveToggle">Connect</button>
                         </div>
                     </div>
-                    <div class="settings-card">
+
+                    <div class="settings-card glass-card">
                         <h3>Default Settings</h3>
-                        <div class="form-group">
-                            <label for="default-template">Default Template</label>
-                            <select id="default-template">
-                                <option value="modern">Modern</option>
-                                <option value="classic">Classic</option>
-                                <option value="minimal">Minimal</option>
+                        <div class="setting-item">
+                            <label>Default Tax Rate (%)</label>
+                            <input type="number" id="defaultTaxRate" class="glass-input" value="0" min="0" max="100" step="0.1">
+                        </div>
+                        <div class="setting-item">
+                            <label>Default Template</label>
+                            <select id="defaultTemplate" class="glass-input">
+                                <option value="modern">Modern Blue</option>
+                                <option value="elegant">Elegant Purple</option>
+                                <option value="minimal">Minimal Green</option>
                             </select>
                         </div>
-                        <div class="form-group">
-                            <label for="default-tax-rate">Default Tax Rate (%)</label>
-                            <input type="number" id="default-tax-rate" value="0" min="0" max="100" step="0.1">
+                        <button class="primary-btn" id="saveSettingsBtn">Save Settings</button>
+                    </div>
+
+                    <div class="settings-card glass-card">
+                        <h3>Data Management</h3>
+                        <div class="setting-item">
+                            <button class="secondary-btn" id="exportDataBtn">
+                                <i class="fas fa-download"></i>
+                                Export Data
+                            </button>
                         </div>
-                        <button id="save-settings" class="btn btn-success">Save Settings</button>
+                        <div class="setting-item">
+                            <input type="file" id="importDataInput" accept=".json" style="display: none;">
+                            <button class="secondary-btn" id="importDataBtn">
+                                <i class="fas fa-upload"></i>
+                                Import Data
+                            </button>
+                        </div>
+                        <div class="setting-item">
+                            <button class="danger-btn" id="clearDataBtn">
+                                <i class="fas fa-trash"></i>
+                                Clear All Data
+                            </button>
+                        </div>
                     </div>
                 </div>
             </section>
         </main>
     </div>
 
-    <!-- Invoice Preview Modal -->
-    <div id="preview-modal" class="modal">
-        <div class="modal-content">
+    <!-- Modal for Invoice Preview -->
+    <div id="previewModal" class="modal">
+        <div class="modal-content glass-card">
             <div class="modal-header">
                 <h2>Invoice Preview</h2>
-                <button class="modal-close">&times;</button>
+                <button class="modal-close" id="closeModal">
+                    <i class="fas fa-times"></i>
+                </button>
             </div>
             <div class="modal-body">
-                <div id="modal-invoice-preview"></div>
+                <div id="modalInvoicePreview"></div>
             </div>
             <div class="modal-footer">
-                <button id="print-invoice" class="btn btn-secondary">
-                    <i class="fas fa-print"></i> Print
+                <button class="secondary-btn" id="modalPrintBtn">
+                    <i class="fas fa-print"></i>
+                    Print
                 </button>
-                <button id="download-pdf" class="btn btn-primary">
-                    <i class="fas fa-download"></i> Download PDF
+                <button class="primary-btn" id="modalExportBtn">
+                    <i class="fas fa-file-pdf"></i>
+                    Export PDF
                 </button>
             </div>
         </div>
     </div>
 
+    <!-- Scripts -->
     <script src="js/storage.js"></script>
     <script src="js/templates.js"></script>
     <script src="js/google-drive.js"></script>
-    <script src="js/pdf-generator.js"></script>
     <script src="js/invoice-builder.js"></script>
     <script src="js/app.js"></script>
 </body>

@@ -1,9 +1,9 @@
-// Local Storage management
+// Local Storage Management
 class Storage {
     static KEYS = {
         INVOICES: 'invoicepro_invoices',
         SETTINGS: 'invoicepro_settings',
-        BUSINESS_INFO: 'invoicepro_business_info'
+        COMPANY_INFO: 'invoicepro_company_info'
     };
 
     // Invoice operations
@@ -24,7 +24,7 @@ class Storage {
         if (existingIndex >= 0) {
             invoices[existingIndex] = invoice;
         } else {
-            invoices.push(invoice);
+            invoices.unshift(invoice); // Add to beginning
         }
         
         localStorage.setItem(this.KEYS.INVOICES, JSON.stringify(invoices));
@@ -60,17 +60,18 @@ class Storage {
             defaultTemplate: 'modern',
             defaultTaxRate: 0,
             currency: 'USD',
-            dateFormat: 'MM/DD/YYYY'
+            dateFormat: 'MM/DD/YYYY',
+            theme: 'dark'
         };
     }
 
-    // Business info operations
-    static saveBusinessInfo(info) {
-        localStorage.setItem(this.KEYS.BUSINESS_INFO, JSON.stringify(info));
+    // Company info operations
+    static saveCompanyInfo(info) {
+        localStorage.setItem(this.KEYS.COMPANY_INFO, JSON.stringify(info));
     }
 
-    static getBusinessInfo() {
-        const info = localStorage.getItem(this.KEYS.BUSINESS_INFO);
+    static getCompanyInfo() {
+        const info = localStorage.getItem(this.KEYS.COMPANY_INFO);
         return info ? JSON.parse(info) : {};
     }
 
@@ -83,9 +84,9 @@ class Storage {
         const data = {
             invoices: this.getInvoices(),
             settings: this.getSettings(),
-            businessInfo: this.getBusinessInfo(),
+            companyInfo: this.getCompanyInfo(),
             exportDate: new Date().toISOString(),
-            version: '1.0'
+            version: '2.0'
         };
         
         return JSON.stringify(data, null, 2);
@@ -103,8 +104,8 @@ class Storage {
                 localStorage.setItem(this.KEYS.SETTINGS, JSON.stringify(data.settings));
             }
             
-            if (data.businessInfo) {
-                localStorage.setItem(this.KEYS.BUSINESS_INFO, JSON.stringify(data.businessInfo));
+            if (data.companyInfo) {
+                localStorage.setItem(this.KEYS.COMPANY_INFO, JSON.stringify(data.companyInfo));
             }
             
             return true;
@@ -126,46 +127,24 @@ class Storage {
         const now = new Date();
         const currentMonth = now.getMonth();
         const currentYear = now.getFullYear();
-        const lastMonth = new Date(currentYear, currentMonth - 1, 1);
         
         return {
             total: invoices.length,
-            totalAmount: invoices.reduce((sum, inv) => sum + parseFloat(inv.total || 0), 0),
+            totalAmount: invoices.reduce((sum, inv) => sum + (inv.total || 0), 0),
             thisMonth: invoices.filter(inv => {
                 const date = new Date(inv.date);
                 return date.getMonth() === currentMonth && date.getFullYear() === currentYear;
             }).length,
-            lastMonth: invoices.filter(inv => {
-                const date = new Date(inv.date);
-                return date.getMonth() === lastMonth.getMonth() && 
-                       date.getFullYear() === lastMonth.getFullYear();
+            paid: invoices.filter(inv => inv.status === 'paid').length,
+            pending: invoices.filter(inv => inv.status === 'pending').length,
+            overdue: invoices.filter(inv => {
+                const dueDate = new Date(inv.dueDate);
+                return inv.status !== 'paid' && dueDate < now;
             }).length,
-            byStatus: this.getInvoicesByStatus(),
             recentInvoices: invoices
                 .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
-                .slice(0, 5)
+                .slice(0, 10)
         };
-    }
-
-    static getInvoicesByStatus() {
-        const invoices = this.getInvoices();
-        const now = new Date();
-        
-        return invoices.reduce((acc, invoice) => {
-            const dueDate = new Date(invoice.dueDate);
-            let status;
-            
-            if (invoice.paid) {
-                status = 'paid';
-            } else if (dueDate < now) {
-                status = 'overdue';
-            } else {
-                status = 'pending';
-            }
-            
-            acc[status] = (acc[status] || 0) + 1;
-            return acc;
-        }, {});
     }
 
     // Search and filter
@@ -174,14 +153,19 @@ class Storage {
         const searchTerm = query.toLowerCase();
         
         return invoices.filter(invoice => 
-            invoice.number?.toLowerCase().includes(searchTerm) ||
-            invoice.clientName?.toLowerCase().includes(searchTerm) ||
-            invoice.clientEmail?.toLowerCase().includes(searchTerm) ||
-            invoice.businessName?.toLowerCase().includes(searchTerm)
+            (invoice.number || '').toLowerCase().includes(searchTerm) ||
+            (invoice.clientName || '').toLowerCase().includes(searchTerm) ||
+            (invoice.clientEmail || '').toLowerCase().includes(searchTerm) ||
+            (invoice.companyName || '').toLowerCase().includes(searchTerm)
         );
     }
 
-    static filterInvoicesByDate(startDate, endDate) {
+    static filterInvoicesByStatus(status) {
+        const invoices = this.getInvoices();
+        return invoices.filter(invoice => invoice.status === status);
+    }
+
+    static filterInvoicesByDateRange(startDate, endDate) {
         const invoices = this.getInvoices();
         const start = new Date(startDate);
         const end = new Date(endDate);
@@ -192,12 +176,52 @@ class Storage {
         });
     }
 
-    static filterInvoicesByAmount(minAmount, maxAmount) {
+    static getInvoicesByMonth(year, month) {
         const invoices = this.getInvoices();
-        
         return invoices.filter(invoice => {
-            const amount = parseFloat(invoice.total || 0);
-            return amount >= minAmount && amount <= maxAmount;
+            const date = new Date(invoice.date);
+            return date.getFullYear() === year && date.getMonth() === month;
         });
+    }
+
+    // Backup and restore
+    static createBackup() {
+        const backup = {
+            timestamp: new Date().toISOString(),
+            data: {
+                invoices: this.getInvoices(),
+                settings: this.getSettings(),
+                companyInfo: this.getCompanyInfo()
+            }
+        };
+        
+        return JSON.stringify(backup, null, 2);
+    }
+
+    static restoreFromBackup(backupData) {
+        try {
+            const backup = JSON.parse(backupData);
+            
+            if (backup.data) {
+                if (backup.data.invoices) {
+                    localStorage.setItem(this.KEYS.INVOICES, JSON.stringify(backup.data.invoices));
+                }
+                
+                if (backup.data.settings) {
+                    localStorage.setItem(this.KEYS.SETTINGS, JSON.stringify(backup.data.settings));
+                }
+                
+                if (backup.data.companyInfo) {
+                    localStorage.setItem(this.KEYS.COMPANY_INFO, JSON.stringify(backup.data.companyInfo));
+                }
+                
+                return true;
+            }
+            
+            return false;
+        } catch (error) {
+            console.error('Error restoring backup:', error);
+            return false;
+        }
     }
 }

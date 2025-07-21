@@ -1,67 +1,124 @@
-// Google Drive API integration
-class GoogleDrive {
-    static CLIENT_ID = 'your-google-client-id'; // Replace with actual client ID
-    static API_KEY = 'your-google-api-key'; // Replace with actual API key
+// Google Drive API Integration
+class GoogleDriveAPI {
+    static CLIENT_ID = 'your-google-client-id.apps.googleusercontent.com';
+    static API_KEY = 'your-google-api-key';
     static DISCOVERY_DOC = 'https://www.googleapis.com/discovery/v1/apis/drive/v3/rest';
     static SCOPES = 'https://www.googleapis.com/auth/drive.file';
     
     static isInitialized = false;
-    static isAuthenticated = false;
+    static isSignedIn = false;
+    static tokenClient = null;
+    static accessToken = null;
 
     static async init() {
         try {
-            // Note: In a real implementation, you would need to set up proper OAuth2
-            // This is a simplified version for demonstration
-            console.log('Google Drive API initialized (demo mode)');
+            // Initialize Google API
+            await new Promise((resolve) => {
+                gapi.load('client', resolve);
+            });
+
+            await gapi.client.init({
+                apiKey: this.API_KEY,
+                discoveryDocs: [this.DISCOVERY_DOC],
+            });
+
+            // Initialize Google Identity Services
+            this.tokenClient = google.accounts.oauth2.initTokenClient({
+                client_id: this.CLIENT_ID,
+                scope: this.SCOPES,
+                callback: (response) => {
+                    if (response.error) {
+                        console.error('OAuth error:', response.error);
+                        this.showNotification('Authentication failed', 'error');
+                        return;
+                    }
+                    
+                    this.accessToken = response.access_token;
+                    this.isSignedIn = true;
+                    this.updateUI();
+                    this.showNotification('Successfully connected to Google Drive!', 'success');
+                },
+            });
+
             this.isInitialized = true;
-            return true;
+            console.log('Google Drive API initialized');
+            
         } catch (error) {
             console.error('Error initializing Google Drive API:', error);
-            return false;
+            this.showNotification('Failed to initialize Google Drive API', 'error');
         }
     }
 
     static async authenticate() {
+        if (!this.isInitialized) {
+            await this.init();
+        }
+
+        if (this.isSignedIn) {
+            this.signOut();
+            return;
+        }
+
         try {
-            // Demo authentication - in real app, use proper OAuth2 flow
-            console.log('Authenticating with Google Drive (demo mode)');
-            
-            // Simulate authentication success
-            this.isAuthenticated = true;
-            app.updateAuthStatus(true);
-            
-            // Show success message
-            alert('Successfully connected to Google Drive (Demo Mode)\n\nNote: This is a demo. In a real application, you would need to:\n1. Set up Google API credentials\n2. Configure OAuth2\n3. Handle proper authentication flow');
-            
-            return true;
+            // Request access token
+            this.tokenClient.requestAccessToken({ prompt: 'consent' });
         } catch (error) {
-            console.error('Authentication failed:', error);
-            alert('Authentication failed. Please try again.');
-            return false;
+            console.error('Authentication error:', error);
+            this.showNotification('Authentication failed', 'error');
         }
     }
 
-    static async signOut() {
-        try {
-            this.isAuthenticated = false;
-            app.updateAuthStatus(false);
-            console.log('Signed out from Google Drive');
-            return true;
-        } catch (error) {
-            console.error('Sign out failed:', error);
-            return false;
+    static signOut() {
+        if (this.accessToken) {
+            google.accounts.oauth2.revoke(this.accessToken);
+            this.accessToken = null;
+        }
+        
+        this.isSignedIn = false;
+        this.updateUI();
+        this.showNotification('Disconnected from Google Drive', 'info');
+    }
+
+    static async toggleConnection() {
+        if (this.isSignedIn) {
+            this.signOut();
+        } else {
+            await this.authenticate();
         }
     }
 
-    static isSignedIn() {
-        return this.isAuthenticated;
+    static updateUI() {
+        if (typeof app !== 'undefined') {
+            app.updateGoogleDriveStatus(this.isSignedIn);
+        }
     }
 
     static async createInvoicesFolder() {
+        if (!this.isSignedIn) {
+            throw new Error('Not authenticated');
+        }
+
         try {
-            // In a real implementation, this would create a folder in Google Drive
-            console.log('Creating Invoices folder (demo mode)');
-            return 'demo-folder-id';
+            // Check if folder already exists
+            const response = await gapi.client.drive.files.list({
+                q: "name='Invoices' and mimeType='application/vnd.google-apps.folder' and trashed=false",
+                fields: 'files(id, name)'
+            });
+
+            if (response.result.files.length > 0) {
+                return response.result.files[0].id;
+            }
+
+            // Create new folder
+            const folderResponse = await gapi.client.drive.files.create({
+                resource: {
+                    name: 'Invoices',
+                    mimeType: 'application/vnd.google-apps.folder'
+                },
+                fields: 'id'
+            });
+
+            return folderResponse.result.id;
         } catch (error) {
             console.error('Error creating folder:', error);
             throw error;
@@ -69,58 +126,113 @@ class GoogleDrive {
     }
 
     static async saveInvoice(invoiceData) {
-        if (!this.isAuthenticated) {
+        if (!this.isSignedIn) {
             console.log('Not authenticated with Google Drive');
             return false;
         }
 
         try {
-            console.log('Saving invoice to Google Drive (demo mode):', invoiceData.number);
+            // Generate HTML content
+            const template = invoiceData.template || 'modern';
+            const htmlContent = InvoiceTemplates.exportTemplateHTML(invoiceData, template);
             
-            // In a real implementation, you would:
-            // 1. Convert invoice data to HTML or PDF
-            // 2. Upload to Google Drive using the API
-            // 3. Organize in the "Invoices" folder
+            // Create folder if it doesn't exist
+            const folderId = await this.createInvoicesFolder();
             
-            // Simulate successful save
-            setTimeout(() => {
-                console.log(`Invoice ${invoiceData.number} saved to Google Drive successfully`);
-            }, 1000);
+            // Upload HTML file
+            const filename = `Invoice-${invoiceData.number || 'draft'}.html`;
+            const fileMetadata = {
+                name: filename,
+                parents: [folderId]
+            };
+
+            const form = new FormData();
+            form.append('metadata', new Blob([JSON.stringify(fileMetadata)], {type: 'application/json'}));
+            form.append('file', new Blob([htmlContent], {type: 'text/html'}));
+
+            const response = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+                method: 'POST',
+                headers: new Headers({
+                    'Authorization': `Bearer ${this.accessToken}`
+                }),
+                body: form
+            });
+
+            if (response.ok) {
+                const result = await response.json();
+                this.showNotification(`Invoice saved to Google Drive: ${filename}`, 'success');
+                return result;
+            } else {
+                throw new Error('Upload failed');
+            }
             
-            return true;
         } catch (error) {
             console.error('Error saving to Google Drive:', error);
+            this.showNotification('Failed to save invoice to Google Drive', 'error');
             return false;
         }
     }
 
-    static async uploadPDF(pdfBlob, filename) {
-        if (!this.isAuthenticated) {
+    static async uploadPDF(invoiceData) {
+        if (!this.isSignedIn) {
             console.log('Not authenticated with Google Drive');
             return false;
         }
 
         try {
-            console.log('Uploading PDF to Google Drive (demo mode):', filename);
+            // Generate PDF using html2pdf
+            const template = invoiceData.template || 'modern';
+            const invoiceHtml = InvoiceTemplates.generateHTML(invoiceData, template);
             
-            // In a real implementation, you would:
-            // 1. Create metadata for the file
-            // 2. Upload the PDF blob using Google Drive API
-            // 3. Set proper permissions and folder location
+            const element = document.createElement('div');
+            element.innerHTML = invoiceHtml;
+            element.style.width = '210mm';
+            element.style.minHeight = '297mm';
+            element.style.padding = '20mm';
+            element.style.margin = '0 auto';
+            element.style.background = 'white';
+            element.style.color = '#333';
             
-            // Simulate upload progress
-            const progressSteps = [20, 40, 60, 80, 100];
-            for (let progress of progressSteps) {
-                await new Promise(resolve => setTimeout(resolve, 200));
-                console.log(`Upload progress: ${progress}%`);
+            const opt = {
+                margin: 0,
+                filename: `${invoiceData.number || 'invoice'}.pdf`,
+                image: { type: 'jpeg', quality: 0.98 },
+                html2canvas: { scale: 2, useCORS: true },
+                jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+            };
+
+            const pdfBlob = await html2pdf().set(opt).from(element).outputPdf('blob');
+            
+            // Create folder if it doesn't exist
+            const folderId = await this.createInvoicesFolder();
+            
+            // Upload PDF file
+            const filename = `Invoice-${invoiceData.number || 'draft'}.pdf`;
+            const fileMetadata = {
+                name: filename,
+                parents: [folderId]
+            };
+
+            const form = new FormData();
+            form.append('metadata', new Blob([JSON.stringify(fileMetadata)], {type: 'application/json'}));
+            form.append('file', pdfBlob);
+
+            const response = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+                method: 'POST',
+                headers: new Headers({
+                    'Authorization': `Bearer ${this.accessToken}`
+                }),
+                body: form
+            });
+
+            if (response.ok) {
+                const result = await response.json();
+                this.showNotification(`PDF uploaded to Google Drive: ${filename}`, 'success');
+                return result;
+            } else {
+                throw new Error('Upload failed');
             }
             
-            console.log(`PDF ${filename} uploaded successfully`);
-            
-            // Show success notification
-            this.showNotification('PDF uploaded to Google Drive successfully!', 'success');
-            
-            return true;
         } catch (error) {
             console.error('Error uploading PDF:', error);
             this.showNotification('Failed to upload PDF to Google Drive', 'error');
@@ -129,91 +241,112 @@ class GoogleDrive {
     }
 
     static async listInvoices() {
-        if (!this.isAuthenticated) {
+        if (!this.isSignedIn) {
             return [];
         }
 
         try {
-            console.log('Listing invoices from Google Drive (demo mode)');
-            
-            // In a real implementation, this would fetch actual files from Google Drive
-            // Return demo data
-            return [
-                {
-                    id: 'demo-1',
-                    name: 'Invoice-INV-001.pdf',
-                    createdTime: new Date().toISOString(),
-                    size: '125KB'
-                },
-                {
-                    id: 'demo-2',
-                    name: 'Invoice-INV-002.pdf',
-                    createdTime: new Date(Date.now() - 86400000).toISOString(),
-                    size: '98KB'
-                }
-            ];
+            const response = await gapi.client.drive.files.list({
+                q: "parents in (select id from drive where name='Invoices') and trashed=false",
+                fields: 'files(id, name, createdTime, size, webViewLink)',
+                orderBy: 'createdTime desc'
+            });
+
+            return response.result.files || [];
         } catch (error) {
             console.error('Error listing invoices:', error);
             return [];
         }
     }
 
-    static async downloadInvoice(fileId) {
+    static async deleteInvoice(fileId) {
+        if (!this.isSignedIn) {
+            return false;
+        }
+
         try {
-            console.log('Downloading invoice from Google Drive (demo mode):', fileId);
-            
-            // In a real implementation, this would download the file from Google Drive
-            alert('File download would start here in a real implementation');
-            
+            await gapi.client.drive.files.delete({
+                fileId: fileId
+            });
+
+            this.showNotification('Invoice deleted from Google Drive', 'success');
             return true;
         } catch (error) {
-            console.error('Error downloading invoice:', error);
+            console.error('Error deleting invoice:', error);
+            this.showNotification('Failed to delete invoice from Google Drive', 'error');
             return false;
         }
     }
 
-    static async deleteInvoice(fileId) {
-        try {
-            console.log('Deleting invoice from Google Drive (demo mode):', fileId);
-            
-            // In a real implementation, this would delete the file from Google Drive
-            if (confirm('Are you sure you want to delete this invoice from Google Drive?')) {
-                console.log('Invoice deleted successfully');
-                return true;
-            }
-            
+    static async downloadInvoice(fileId, filename) {
+        if (!this.isSignedIn) {
             return false;
+        }
+
+        try {
+            const response = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, {
+                headers: {
+                    'Authorization': `Bearer ${this.accessToken}`
+                }
+            });
+
+            if (response.ok) {
+                const blob = await response.blob();
+                const url = URL.createObjectURL(blob);
+                
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                
+                this.showNotification('Invoice downloaded successfully', 'success');
+                return true;
+            } else {
+                throw new Error('Download failed');
+            }
         } catch (error) {
-            console.error('Error deleting invoice:', error);
+            console.error('Error downloading invoice:', error);
+            this.showNotification('Failed to download invoice', 'error');
             return false;
         }
     }
 
     static showNotification(message, type = 'info') {
-        // Create and show a temporary notification
+        // Create notification element
         const notification = document.createElement('div');
+        notification.className = `notification ${type}`;
         notification.style.cssText = `
             position: fixed;
             top: 20px;
             right: 20px;
-            padding: 15px 20px;
-            border-radius: 8px;
+            padding: 1rem 1.5rem;
+            border-radius: 12px;
             color: white;
             font-weight: 500;
             z-index: 10000;
             transition: all 0.3s ease;
-            max-width: 300px;
+            max-width: 350px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
         `;
         
         const colors = {
-            success: '#22C55E',
-            error: '#EF4444',
-            info: '#3B82F6',
-            warning: '#F59E0B'
+            success: 'linear-gradient(135deg, #10b981, #059669)',
+            error: 'linear-gradient(135deg, #ef4444, #dc2626)',
+            info: 'linear-gradient(135deg, #3b82f6, #1e40af)',
+            warning: 'linear-gradient(135deg, #f59e0b, #d97706)'
         };
         
-        notification.style.backgroundColor = colors[type] || colors.info;
-        notification.textContent = message;
+        notification.style.background = colors[type] || colors.info;
+        notification.innerHTML = `
+            <div style="display: flex; align-items: center; gap: 0.5rem;">
+                <i class="fas fa-${type === 'success' ? 'check-circle' : type === 'error' ? 'exclamation-circle' : 'info-circle'}"></i>
+                <span>${message}</span>
+            </div>
+        `;
         
         document.body.appendChild(notification);
         
@@ -222,85 +355,83 @@ class GoogleDrive {
             notification.style.transform = 'translateX(0)';
         }, 100);
         
-        // Remove after 3 seconds
+        // Remove after 5 seconds
         setTimeout(() => {
             notification.style.transform = 'translateX(400px)';
+            notification.style.opacity = '0';
             setTimeout(() => {
                 if (notification.parentNode) {
                     notification.parentNode.removeChild(notification);
                 }
             }, 300);
-        }, 3000);
+        }, 5000);
     }
 
-    // Real implementation helper methods (for reference)
-    static async realAuthentication() {
-        // This is how you would implement real Google Drive authentication
-        /*
-        try {
-            await gapi.load('auth2', async () => {
-                const authInstance = await gapi.auth2.init({
-                    client_id: this.CLIENT_ID,
-                });
-                
-                const user = await authInstance.signIn();
-                const authResponse = user.getAuthResponse();
-                
-                this.isAuthenticated = true;
-                return authResponse.access_token;
-            });
-        } catch (error) {
-            console.error('Real authentication error:', error);
-            throw error;
+    // Backup and sync functionality
+    static async backupAllInvoices() {
+        if (!this.isSignedIn) {
+            this.showNotification('Please connect to Google Drive first', 'warning');
+            return false;
         }
-        */
-    }
 
-    static async realFileUpload(fileBlob, filename, folderId) {
-        // This is how you would implement real file upload
-        /*
-        const metadata = {
-            name: filename,
-            parents: [folderId]
-        };
+        try {
+            const invoices = Storage.getInvoices();
+            const backupData = {
+                timestamp: new Date().toISOString(),
+                invoices: invoices,
+                settings: Storage.getSettings(),
+                version: '2.0'
+            };
 
-        const form = new FormData();
-        form.append('metadata', new Blob([JSON.stringify(metadata)], {type: 'application/json'}));
-        form.append('file', fileBlob);
+            const folderId = await this.createInvoicesFolder();
+            const filename = `InvoicePro-Backup-${new Date().toISOString().split('T')[0]}.json`;
+            
+            const fileMetadata = {
+                name: filename,
+                parents: [folderId]
+            };
 
-        const response = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
-            method: 'POST',
-            headers: new Headers({
-                'Authorization': `Bearer ${accessToken}`
-            }),
-            body: form
-        });
+            const form = new FormData();
+            form.append('metadata', new Blob([JSON.stringify(fileMetadata)], {type: 'application/json'}));
+            form.append('file', new Blob([JSON.stringify(backupData, null, 2)], {type: 'application/json'}));
 
-        return response.json();
-        */
+            const response = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+                method: 'POST',
+                headers: new Headers({
+                    'Authorization': `Bearer ${this.accessToken}`
+                }),
+                body: form
+            });
+
+            if (response.ok) {
+                this.showNotification('All invoices backed up to Google Drive', 'success');
+                return true;
+            } else {
+                throw new Error('Backup failed');
+            }
+        } catch (error) {
+            console.error('Error backing up invoices:', error);
+            this.showNotification('Failed to backup invoices', 'error');
+            return false;
+        }
     }
 }
 
-// Set up authentication event listeners
+// Initialize Google Drive API when the page loads
 document.addEventListener('DOMContentLoaded', () => {
-    // Initialize Google Drive API
-    GoogleDrive.init();
-    
-    // Google auth button in sidebar
-    document.getElementById('google-auth-btn').addEventListener('click', async () => {
-        if (GoogleDrive.isSignedIn()) {
-            await GoogleDrive.signOut();
-        } else {
-            await GoogleDrive.authenticate();
-        }
-    });
-    
-    // Auth toggle in settings
-    document.getElementById('auth-toggle').addEventListener('click', async () => {
-        if (GoogleDrive.isSignedIn()) {
-            await GoogleDrive.signOut();
-        } else {
-            await GoogleDrive.authenticate();
-        }
-    });
+    // Load Google APIs
+    const script1 = document.createElement('script');
+    script1.src = 'https://apis.google.com/js/api.js';
+    script1.onload = () => {
+        const script2 = document.createElement('script');
+        script2.src = 'https://accounts.google.com/gsi/client';
+        script2.onload = () => {
+            // Initialize after both scripts are loaded
+            setTimeout(() => {
+                GoogleDriveAPI.init();
+            }, 1000);
+        };
+        document.head.appendChild(script2);
+    };
+    document.head.appendChild(script1);
 });

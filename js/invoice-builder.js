@@ -1,112 +1,29 @@
-// Invoice builder functionality
+// Invoice Builder Functionality
 class InvoiceBuilder {
-    static currentItems = [];
-    static currentInvoiceId = null;
-
-    static init() {
-        this.setupEventListeners();
-        this.addItem(); // Add first item by default
-        this.updatePreview();
-    }
-
-    static setupEventListeners() {
-        // Add item button
-        document.getElementById('add-item').addEventListener('click', () => {
-            this.addItem();
-        });
-
-        // Save invoice button
-        document.getElementById('save-invoice').addEventListener('click', () => {
-            this.saveInvoice();
-        });
-
-        // Export PDF button
-        document.getElementById('export-pdf').addEventListener('click', () => {
-            PDFGenerator.generatePDF();
-        });
-
-        // Form field changes for live preview
-        const formFields = [
-            'invoice-number', 'invoice-date', 'due-date', 'template-select',
-            'business-name', 'business-address', 'business-email',
-            'client-name', 'client-address', 'client-email',
-            'tax-rate'
-        ];
-
-        formFields.forEach(fieldId => {
-            const field = document.getElementById(fieldId);
-            if (field) {
-                field.addEventListener('input', () => this.updatePreview());
-                field.addEventListener('change', () => this.updatePreview());
-            }
-        });
-    }
+    static items = [];
 
     static addItem() {
-        const itemId = 'item_' + Date.now() + Math.random().toString(36).substr(2, 5);
         const item = {
-            id: itemId,
+            id: this.generateItemId(),
             description: '',
             quantity: 1,
             rate: 0,
             amount: 0
         };
 
-        this.currentItems.push(item);
+        this.items.push(item);
         this.renderItems();
         this.updateCalculations();
-        this.updatePreview();
     }
 
     static removeItem(itemId) {
-        this.currentItems = this.currentItems.filter(item => item.id !== itemId);
+        this.items = this.items.filter(item => item.id !== itemId);
         this.renderItems();
         this.updateCalculations();
-        this.updatePreview();
-    }
-
-    static renderItems() {
-        const container = document.getElementById('items-list');
-        
-        const itemsHtml = this.currentItems.map(item => `
-            <div class="item-row" data-item-id="${item.id}">
-                <input 
-                    type="text" 
-                    placeholder="Description" 
-                    value="${item.description}"
-                    onchange="InvoiceBuilder.updateItem('${item.id}', 'description', this.value)"
-                >
-                <input 
-                    type="number" 
-                    min="0" 
-                    step="0.01" 
-                    value="${item.quantity}"
-                    onchange="InvoiceBuilder.updateItem('${item.id}', 'quantity', this.value)"
-                >
-                <input 
-                    type="number" 
-                    min="0" 
-                    step="0.01" 
-                    value="${item.rate}"
-                    onchange="InvoiceBuilder.updateItem('${item.id}', 'rate', this.value)"
-                >
-                <span class="item-amount">$${item.amount.toFixed(2)}</span>
-                <button 
-                    type="button" 
-                    class="remove-item" 
-                    onclick="InvoiceBuilder.removeItem('${item.id}')"
-                    title="Remove item"
-                >
-                    <i class="fas fa-trash"></i>
-                </button>
-            </div>
-        `).join('');
-
-        container.innerHTML = itemsHtml;
     }
 
     static updateItem(itemId, field, value) {
-        const item = this.currentItems.find(item => item.id === itemId);
+        const item = this.items.find(item => item.id === itemId);
         if (item) {
             if (field === 'description') {
                 item[field] = value;
@@ -119,179 +36,258 @@ class InvoiceBuilder {
             
             // Update the amount display
             const itemRow = document.querySelector(`[data-item-id="${itemId}"]`);
-            const amountSpan = itemRow.querySelector('.item-amount');
-            amountSpan.textContent = `$${item.amount.toFixed(2)}`;
+            if (itemRow) {
+                const amountSpan = itemRow.querySelector('.item-amount');
+                if (amountSpan) {
+                    amountSpan.textContent = `$${item.amount.toFixed(2)}`;
+                }
+            }
             
             this.updateCalculations();
-            this.updatePreview();
+            
+            // Update preview if app is available
+            if (typeof app !== 'undefined') {
+                app.updatePreview();
+            }
         }
+    }
+
+    static renderItems() {
+        const container = document.getElementById('itemsList');
+        if (!container) return;
+        
+        if (this.items.length === 0) {
+            container.innerHTML = `
+                <div class="empty-state">
+                    <i class="fas fa-plus-circle"></i>
+                    <p>No items added yet</p>
+                </div>
+            `;
+            return;
+        }
+
+        const itemsHtml = this.items.map(item => `
+            <div class="item-row" data-item-id="${item.id}">
+                <input 
+                    type="text" 
+                    class="glass-input"
+                    placeholder="Item description" 
+                    value="${item.description}"
+                    oninput="InvoiceBuilder.updateItem('${item.id}', 'description', this.value)"
+                >
+                <input 
+                    type="number" 
+                    class="glass-input"
+                    min="0" 
+                    step="0.01" 
+                    placeholder="Qty"
+                    value="${item.quantity}"
+                    oninput="InvoiceBuilder.updateItem('${item.id}', 'quantity', this.value)"
+                >
+                <input 
+                    type="number" 
+                    class="glass-input"
+                    min="0" 
+                    step="0.01" 
+                    placeholder="Rate"
+                    value="${item.rate}"
+                    oninput="InvoiceBuilder.updateItem('${item.id}', 'rate', this.value)"
+                >
+                <div class="item-amount">$${item.amount.toFixed(2)}</div>
+                <button 
+                    type="button" 
+                    class="remove-item-btn" 
+                    onclick="InvoiceBuilder.removeItem('${item.id}')"
+                    title="Remove item"
+                >
+                    <i class="fas fa-trash"></i>
+                </button>
+            </div>
+        `).join('');
+
+        container.innerHTML = itemsHtml;
     }
 
     static updateCalculations() {
-        const subtotal = this.currentItems.reduce((sum, item) => sum + item.amount, 0);
-        const taxRate = parseFloat(document.getElementById('tax-rate').value) || 0;
-        const taxAmount = subtotal * (taxRate / 100);
-        const total = subtotal + taxAmount;
+        const subtotal = this.calculateSubtotal();
+        const taxAmount = this.calculateTaxAmount();
+        const total = this.calculateTotal();
 
-        document.getElementById('subtotal').textContent = `$${subtotal.toFixed(2)}`;
-        document.getElementById('tax-amount').textContent = `$${taxAmount.toFixed(2)}`;
-        document.getElementById('total-amount').textContent = `$${total.toFixed(2)}`;
+        const subtotalEl = document.getElementById('subtotal');
+        const taxAmountEl = document.getElementById('taxAmount');
+        const totalAmountEl = document.getElementById('totalAmount');
+
+        if (subtotalEl) subtotalEl.textContent = `$${subtotal.toFixed(2)}`;
+        if (taxAmountEl) taxAmountEl.textContent = `$${taxAmount.toFixed(2)}`;
+        if (totalAmountEl) totalAmountEl.textContent = `$${total.toFixed(2)}`;
     }
 
-    static getInvoiceData() {
-        return {
-            id: this.currentInvoiceId,
-            number: document.getElementById('invoice-number').value,
-            date: document.getElementById('invoice-date').value,
-            dueDate: document.getElementById('due-date').value,
-            template: document.getElementById('template-select').value,
-            
-            // Business info
-            businessName: document.getElementById('business-name').value,
-            businessAddress: document.getElementById('business-address').value,
-            businessEmail: document.getElementById('business-email').value,
-            
-            // Client info
-            clientName: document.getElementById('client-name').value,
-            clientAddress: document.getElementById('client-address').value,
-            clientEmail: document.getElementById('client-email').value,
-            
-            // Items and calculations
-            items: this.currentItems,
-            taxRate: parseFloat(document.getElementById('tax-rate').value) || 0,
-            subtotal: this.currentItems.reduce((sum, item) => sum + item.amount, 0),
-            taxAmount: this.currentItems.reduce((sum, item) => sum + item.amount, 0) * 
-                      ((parseFloat(document.getElementById('tax-rate').value) || 0) / 100),
-            total: this.currentItems.reduce((sum, item) => sum + item.amount, 0) * 
-                   (1 + ((parseFloat(document.getElementById('tax-rate').value) || 0) / 100))
-        };
+    static calculateSubtotal() {
+        return this.items.reduce((sum, item) => sum + (item.amount || 0), 0);
     }
 
-    static updatePreview() {
-        const invoiceData = this.getInvoiceData();
-        const template = invoiceData.template || 'modern';
-        const previewHtml = InvoiceTemplates.generateHTML(invoiceData, template);
-        
-        document.getElementById('invoice-preview').innerHTML = previewHtml;
+    static calculateTaxAmount() {
+        const subtotal = this.calculateSubtotal();
+        const taxRateEl = document.getElementById('taxRate');
+        const taxRate = taxRateEl ? parseFloat(taxRateEl.value) || 0 : 0;
+        return subtotal * (taxRate / 100);
     }
 
-    static saveInvoice() {
-        const invoiceData = this.getInvoiceData();
-        
-        // Validate required fields
-        if (!invoiceData.number || !invoiceData.clientName) {
-            alert('Please fill in the invoice number and client name.');
-            return;
-        }
-
-        if (this.currentItems.length === 0 || this.currentItems.every(item => !item.description)) {
-            alert('Please add at least one item to the invoice.');
-            return;
-        }
-
-        // Save to localStorage
-        const savedInvoice = Storage.saveInvoice(invoiceData);
-        this.currentInvoiceId = savedInvoice.id;
-
-        // Save to Google Drive if authenticated
-        if (app.isAuthenticated) {
-            GoogleDrive.saveInvoice(savedInvoice);
-        }
-
-        // Update dashboard
-        app.updateDashboardStats();
-        app.loadInvoicesList();
-
-        // Show success message
-        const btn = document.getElementById('save-invoice');
-        const originalText = btn.innerHTML;
-        btn.innerHTML = '<i class="fas fa-check"></i> Saved!';
-        btn.style.background = 'var(--success-color)';
-        
-        setTimeout(() => {
-            btn.innerHTML = originalText;
-            btn.style.background = '';
-        }, 2000);
+    static calculateTotal() {
+        return this.calculateSubtotal() + this.calculateTaxAmount();
     }
 
-    static loadInvoice(invoice) {
-        this.currentInvoiceId = invoice.id;
-        this.currentItems = invoice.items || [];
+    static getItems() {
+        return this.items;
+    }
 
-        // Fill form fields
-        document.getElementById('invoice-number').value = invoice.number || '';
-        document.getElementById('invoice-date').value = invoice.date || '';
-        document.getElementById('due-date').value = invoice.dueDate || '';
-        document.getElementById('template-select').value = invoice.template || 'modern';
-        
-        document.getElementById('business-name').value = invoice.businessName || '';
-        document.getElementById('business-address').value = invoice.businessAddress || '';
-        document.getElementById('business-email').value = invoice.businessEmail || '';
-        
-        document.getElementById('client-name').value = invoice.clientName || '';
-        document.getElementById('client-address').value = invoice.clientAddress || '';
-        document.getElementById('client-email').value = invoice.clientEmail || '';
-        
-        document.getElementById('tax-rate').value = invoice.taxRate || 0;
-
-        // Render items and update calculations
+    static loadItems(items) {
+        this.items = items.map(item => ({
+            ...item,
+            id: item.id || this.generateItemId()
+        }));
         this.renderItems();
         this.updateCalculations();
-        this.updatePreview();
     }
 
-    static clearForm() {
-        this.currentInvoiceId = null;
-        this.currentItems = [];
+    static clearItems() {
+        this.items = [];
+        this.renderItems();
+        this.updateCalculations();
+    }
+
+    static generateItemId() {
+        return 'item_' + Math.random().toString(36).substr(2, 9) + Date.now().toString(36);
+    }
+
+    // Preset items functionality
+    static addPresetItem(description, rate) {
+        const item = {
+            id: this.generateItemId(),
+            description: description,
+            quantity: 1,
+            rate: rate,
+            amount: rate
+        };
+
+        this.items.push(item);
+        this.renderItems();
+        this.updateCalculations();
         
-        // Clear all form fields
-        document.querySelectorAll('#invoice-builder input, #invoice-builder textarea, #invoice-builder select').forEach(field => {
-            if (field.type === 'date') {
-                field.value = field.defaultValue || '';
-            } else if (field.type === 'number') {
-                field.value = 0;
-            } else {
-                field.value = '';
+        if (typeof app !== 'undefined') {
+            app.updatePreview();
+        }
+    }
+
+    // Bulk operations
+    static duplicateItem(itemId) {
+        const item = this.items.find(item => item.id === itemId);
+        if (item) {
+            const duplicatedItem = {
+                ...item,
+                id: this.generateItemId()
+            };
+            this.items.push(duplicatedItem);
+            this.renderItems();
+            this.updateCalculations();
+            
+            if (typeof app !== 'undefined') {
+                app.updatePreview();
+            }
+        }
+    }
+
+    static moveItemUp(itemId) {
+        const index = this.items.findIndex(item => item.id === itemId);
+        if (index > 0) {
+            [this.items[index], this.items[index - 1]] = [this.items[index - 1], this.items[index]];
+            this.renderItems();
+        }
+    }
+
+    static moveItemDown(itemId) {
+        const index = this.items.findIndex(item => item.id === itemId);
+        if (index < this.items.length - 1) {
+            [this.items[index], this.items[index + 1]] = [this.items[index + 1], this.items[index]];
+            this.renderItems();
+        }
+    }
+
+    // Import/Export items
+    static exportItems() {
+        return JSON.stringify(this.items, null, 2);
+    }
+
+    static importItems(itemsJson) {
+        try {
+            const items = JSON.parse(itemsJson);
+            if (Array.isArray(items)) {
+                this.loadItems(items);
+                return true;
+            }
+            return false;
+        } catch (error) {
+            console.error('Error importing items:', error);
+            return false;
+        }
+    }
+
+    // Validation
+    static validateItems() {
+        const errors = [];
+        
+        if (this.items.length === 0) {
+            errors.push('At least one item is required');
+        }
+        
+        this.items.forEach((item, index) => {
+            if (!item.description.trim()) {
+                errors.push(`Item ${index + 1}: Description is required`);
+            }
+            
+            if (item.quantity <= 0) {
+                errors.push(`Item ${index + 1}: Quantity must be greater than 0`);
+            }
+            
+            if (item.rate < 0) {
+                errors.push(`Item ${index + 1}: Rate cannot be negative`);
             }
         });
-
-        // Set default dates
-        const today = new Date().toISOString().split('T')[0];
-        document.getElementById('invoice-date').value = today;
         
-        const dueDate = new Date();
-        dueDate.setDate(dueDate.getDate() + 30);
-        document.getElementById('due-date').value = dueDate.toISOString().split('T')[0];
-
-        // Generate new invoice number
-        app.generateInvoiceNumber();
-
-        // Add default item
-        this.addItem();
-        this.updatePreview();
+        return errors;
     }
 
-    static duplicateInvoice() {
-        const currentData = this.getInvoiceData();
-        
-        // Clear ID and generate new number
-        this.currentInvoiceId = null;
-        app.generateInvoiceNumber();
-        
-        // Update date to today
-        const today = new Date().toISOString().split('T')[0];
-        document.getElementById('invoice-date').value = today;
-        
-        // Update due date
-        const dueDate = new Date();
-        dueDate.setDate(dueDate.getDate() + 30);
-        document.getElementById('due-date').value = dueDate.toISOString().split('T')[0];
-        
-        this.updatePreview();
+    // Auto-save functionality
+    static enableAutoSave() {
+        setInterval(() => {
+            if (this.items.length > 0) {
+                localStorage.setItem('invoicepro_draft_items', JSON.stringify(this.items));
+            }
+        }, 30000); // Auto-save every 30 seconds
+    }
+
+    static loadDraftItems() {
+        const draftItems = localStorage.getItem('invoicepro_draft_items');
+        if (draftItems) {
+            try {
+                const items = JSON.parse(draftItems);
+                if (Array.isArray(items) && items.length > 0) {
+                    this.loadItems(items);
+                    return true;
+                }
+            } catch (error) {
+                console.error('Error loading draft items:', error);
+            }
+        }
+        return false;
+    }
+
+    static clearDraftItems() {
+        localStorage.removeItem('invoicepro_draft_items');
     }
 }
 
-// Initialize when DOM is ready
+// Initialize auto-save when the module loads
 document.addEventListener('DOMContentLoaded', () => {
-    InvoiceBuilder.init();
+    InvoiceBuilder.enableAutoSave();
 });
